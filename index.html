@@ -1,0 +1,300 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IA ASISTENTE 4.0</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#050b18;color:white;
+ font-family:Arial,sans-serif;height:100vh;
+ display:flex;flex-direction:column
+}
+header{
+ text-align:center;padding:17px;
+ color:#54caff;font-size:22px;
+ font-weight:bold;letter-spacing:2px
+}
+.orb{
+ width:125px;height:125px;margin:12px auto;
+ border-radius:50%;
+ background:radial-gradient(circle at 35% 30%,#d4ffff,#36aaff 35%,#0751b8 70%,#06133e);
+ box-shadow:0 0 25px #168cff,0 0 65px #075bff;
+ animation:idle 2s infinite alternate;
+ transition:all .3s;
+}
+@keyframes idle{
+ to{transform:scale(1.06);box-shadow:0 0 40px #29caff,0 0 80px #075bff}
+}
+.orb.listening{
+ animation:listen 0.55s infinite alternate;
+}
+@keyframes listen{
+ to{transform:scale(1.17);box-shadow:0 0 55px #00eaff,0 0 110px #008cff}
+}
+.orb.speaking{
+ animation:talk .25s infinite alternate;
+}
+@keyframes talk{
+ to{transform:scale(1.12);filter:brightness(1.5);box-shadow:0 0 70px #46eaff}
+}
+#status{text-align:center;color:#64cfff;font-size:12px}
+#messages{flex:1;overflow-y:auto;padding:12px}
+.message{
+ padding:12px;border-radius:14px;
+ margin:10px 0;max-width:85%;
+ white-space:pre-wrap;line-height:1.4
+}
+.user{background:#075bba;margin-left:auto}
+.ai{background:#17243b;margin-right:auto}
+footer{display:flex;gap:7px;padding:10px}
+input{
+ flex:1;min-width:0;padding:13px;
+ border-radius:12px;border:1px solid #168cff;
+ background:#101c30;color:white
+}
+button,select{
+ padding:11px;border:0;border-radius:10px;
+ background:#087cff;color:white
+}
+.settings{
+ padding:12px;background:#101c30;
+ border-top:1px solid #168cff
+}
+.settings select{width:100%;margin:6px 0 10px;background:#203653}
+label{font-size:13px;color:#9ddfff}
+.controls{display:flex;gap:7px;flex-wrap:wrap}
+.controls button{flex:1}
+.danger{background:#a52a3b}
+</style>
+</head>
+
+<body>
+
+<header>IA ASISTENTE 4.0</header>
+
+<div class="orb" id="orb"></div>
+<div id="status">Sistema preparado 💙</div>
+
+<div id="messages"></div>
+
+<div class="settings">
+
+<label>Idioma</label>
+<select id="language">
+<option value="auto">Automático</option>
+<option value="es-ES">Español</option>
+<option value="en-US">English</option>
+<option value="fr-FR">Français</option>
+<option value="de-DE">Deutsch</option>
+<option value="pt-BR">Português</option>
+<option value="ja-JP">日本語</option>
+<option value="ko-KR">한국어</option>
+<option value="zh-CN">中文</option>
+<option value="it-IT">Italiano</option>
+</select>
+
+<label>Voz</label>
+<select id="voice">
+<option value="all">Predeterminada</option>
+<option value="female">Preferir femenina</option>
+<option value="male">Preferir masculina</option>
+</select>
+
+<label>Velocidad</label>
+<input id="speed" type="range" min="0.6" max="1.5" step="0.1" value="1">
+
+<div class="controls">
+<button onclick="toggleSpeech()">🔊 Voz</button>
+<button onclick="listen()">🎙️ Hablar</button>
+<button onclick="testVoice()">🗣️ Probar voz</button>
+<button class="danger" onclick="clearHistory()">🗑️ Borrar memoria</button>
+</div>
+</div>
+
+<footer>
+<input id="input" placeholder="Escríbeme algo...">
+<button onclick="sendMessage()">Enviar</button>
+</footer>
+
+<script>
+const messages=document.getElementById("messages");
+const input=document.getElementById("input");
+const statusText=document.getElementById("status");
+const orb=document.getElementById("orb");
+
+const STORAGE_KEY="ia_asistente_history_v3";
+
+let speechEnabled=true;
+let history=[];
+
+function setOrb(mode){
+ orb.className="orb";
+ if(mode==="listening")orb.classList.add("listening");
+ if(mode==="speaking")orb.classList.add("speaking");
+}
+
+function saveHistory(){
+ try{
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(history));
+ }catch(e){
+  statusText.textContent="Error guardando memoria";
+ }
+}
+
+function addMessage(text,type,save=true){
+ const div=document.createElement("div");
+ div.className="message "+type;
+ div.textContent=text;
+ messages.appendChild(div);
+ messages.scrollTop=messages.scrollHeight;
+
+ if(save){
+  history.push({text,type});
+  saveHistory();
+ }
+}
+
+function loadHistory(){
+ try{
+  history=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");
+  if(!Array.isArray(history))history=[];
+ }catch(e){history=[]}
+
+ if(history.length===0){
+  addMessage("¡Hola! Soy IA ASISTENTE 4.0. Mi sistema está preparado. 💙","ai");
+ }else{
+  history.forEach(item=>{
+   if(item && typeof item.text==="string" &&
+   ["user","ai"].includes(item.type)){
+    addMessage(item.text,item.type,false);
+   }
+  });
+ }
+}
+
+function clearHistory(){
+ if(!confirm("¿Borrar toda la memoria?"))return;
+ history=[];
+ localStorage.removeItem(STORAGE_KEY);
+ messages.innerHTML="";
+ addMessage("¡Memoria limpia! 💙","ai");
+}
+
+function getLanguage(){
+ const selected=document.getElementById("language").value;
+ return selected==="auto"?"es-ES":selected;
+}
+
+function speak(text,lang){
+ if(!speechEnabled || !("speechSynthesis" in window))return;
+
+ speechSynthesis.cancel();
+
+ const utterance=new SpeechSynthesisUtterance(text);
+ utterance.lang=lang;
+ utterance.rate=Number(document.getElementById("speed").value);
+
+ const voices=speechSynthesis.getVoices();
+ const matching=voices.filter(v=>v.lang.toLowerCase().startsWith(lang.slice(0,2).toLowerCase()));
+
+ const preference=document.getElementById("voice").value;
+
+ if(matching.length){
+  let chosen=matching[0];
+  if(preference!=="all"){
+   const preferred=matching.find(v=>
+    preference==="female"
+    ? /female|woman|mujer|femenina/i.test(v.name)
+    : /male|man|hombre|masculina/i.test(v.name)
+   );
+   if(preferred)chosen=preferred;
+  }
+  utterance.voice=chosen;
+ }
+
+ utterance.onstart=()=>{
+  setOrb("speaking");
+  statusText.textContent="Hablando...";
+ };
+ utterance.onend=()=>{
+  setOrb("idle");
+  statusText.textContent="Sistema preparado 💙";
+ };
+ utterance.onerror=()=>{
+  setOrb("idle");
+  statusText.textContent="No se pudo reproducir la voz";
+ };
+
+ speechSynthesis.speak(utterance);
+}
+
+function testVoice(){
+ speak("Hola, soy IA ASISTENTE. Mi sistema de voz está funcionando.","es-ES");
+}
+
+function sendMessage(){
+ const text=input.value.trim();
+ if(!text)return;
+
+ addMessage(text,"user");
+ input.value="";
+
+ addMessage(
+ "¡Mensaje recibido! Mi interfaz, memoria y sistema visual están funcionando. Todavía necesito conectar un modelo de inteligencia artificial para responder inteligentemente. 🧠💙",
+ "ai"
+ );
+
+ statusText.textContent="Mensaje guardado";
+}
+
+function toggleSpeech(){
+ speechEnabled=!speechEnabled;
+
+ if(!speechEnabled && "speechSynthesis" in window){
+  speechSynthesis.cancel();
+  setOrb("idle");
+ }
+
+ statusText.textContent=speechEnabled?"Voz activada 🔊":"Voz silenciada";
+}
+
+function listen(){
+ const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+
+ if(!SpeechRecognition){
+  statusText.textContent="Micrófono no compatible";
+  return;
+ }
+
+ const recognition=new SpeechRecognition();
+ recognition.lang=getLanguage();
+ recognition.onstart=()=>{
+  setOrb("listening");
+  statusText.textContent="Escuchando...";
+ };
+ recognition.onresult=e=>{
+  input.value=e.results[0][0].transcript;
+  setOrb("idle");
+  sendMessage();
+ };
+ recognition.onerror=()=>{
+  setOrb("idle");
+  statusText.textContent="Error de micrófono";
+ };
+ recognition.onend=()=>{
+  setOrb("idle");
+  statusText.textContent="Sistema preparado 💙";
+ };
+
+ recognition.start();
+}
+
+loadHistory();
+</script>
+
+</body>
+</html>
